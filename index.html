@@ -1,0 +1,1882 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Reparto de Propinas</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23064e3b'/%3E%3Cg transform='translate(4,4)' fill='none' stroke='%2334d399' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6'/%3E%3Cpath d='M18.09 10.37A6 6 0 1 1 10.34 18'/%3E%3Cpath d='M7 6h1v4'/%3E%3Cpath d='m16.71 13.88.7.71-2.82 2.82'/%3E%3C/g%3E%3C/svg%3E" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      color-scheme: dark;
+      overflow-x: hidden;
+    }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.8);
+      cursor: pointer;
+    }
+    input[type="color"] {
+      -webkit-appearance: none;
+      appearance: none;
+      border: none;
+      padding: 0;
+      background: transparent;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+    /* Evita zoom automático en iOS al tocar inputs */
+    @media (max-width: 640px) {
+      input[type="text"], input[type="time"], select {
+        font-size: 16px !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-16 selection:bg-emerald-500/30 selection:text-emerald-200">
+
+  <!-- Navbar responsive -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-30">
+    <div class="w-full px-3.5 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="bg-emerald-500/15 border border-emerald-500/30 p-2 rounded-xl text-emerald-400 shrink-0">
+          <i data-lucide="coins" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0">
+          <h1 class="font-bold text-base sm:text-lg leading-tight text-white truncate">Reparto de Propinas</h1>
+          <p class="text-[11px] sm:text-xs text-slate-400 truncate">Fudo · Reparto por presencia horaria</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <button onclick="openTeamModal()" class="flex-1 sm:flex-initial justify-center text-xs bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-[0.99] text-emerald-300 border border-emerald-500/30 px-3.5 py-2 rounded-lg font-semibold transition flex items-center gap-1.5">
+          <i data-lucide="users" class="w-3.5 h-3.5"></i>
+          <span>Equipo (<span id="navTeamCount">4</span>)</span>
+        </button>
+        <button onclick="resetScheduleToDefault()" title="Restaurar equipo y horarios de fábrica" class="text-xs bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-slate-300 border border-slate-700 px-3 py-2 rounded-lg font-medium transition flex items-center gap-1.5 shrink-0">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span class="hidden xs:inline sm:inline">Resetear</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Modal Gestión de Empleados y Turnos Base (Responsive) -->
+  <div id="teamModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-slate-900 border-t sm:border border-slate-700 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+      <!-- Header Modal -->
+      <div class="px-4 sm:px-6 py-4 border-b border-slate-800 flex items-start sm:items-center justify-between gap-3">
+        <div>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">Configuración del Local</span>
+          <h2 class="text-base sm:text-lg font-bold text-white">Equipo y Turnos Base</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Personaliza nombres, colores (paleta o código HEX) y días base.</p>
+        </div>
+        <button onclick="closeTeamModal()" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Cuerpo Modal -->
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-5">
+        <!-- Lista de empleados actuales -->
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-1 mb-3">
+            <h3 class="text-sm font-bold text-white">Integrantes del equipo</h3>
+            <span class="text-[11px] text-slate-400">Cambiar nombre o color actualiza toda la vista</span>
+          </div>
+          <div id="teamMembersList" class="space-y-3"></div>
+        </div>
+
+        <!-- Formulario añadir nuevo empleado -->
+        <div class="bg-slate-950/90 border border-emerald-500/20 rounded-xl p-3.5 sm:p-4">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            Contratar / Añadir nuevo integrante
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-12 gap-2.5 sm:gap-3 items-end">
+            <div class="col-span-2 sm:col-span-5">
+              <label class="block text-xs text-slate-400 mb-1">Nombre</label>
+              <input type="text" id="newMemberName" placeholder="Ej: Camila" class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
+            <div class="col-span-1 sm:col-span-3">
+              <label class="block text-xs text-slate-400 mb-1">Entrada</label>
+              <input type="time" id="newMemberStart" value="09:40" class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-lg px-2 py-2 text-sm text-white" />
+            </div>
+            <div class="col-span-1 sm:col-span-3">
+              <label class="block text-xs text-slate-400 mb-1">Salida</label>
+              <input type="time" id="newMemberEnd" value="19:30" class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-lg px-2 py-2 text-sm text-white" />
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <button onclick="addNewTeamMember()" title="Agregar al equipo" class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2.5 sm:py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+                <span class="sm:hidden text-xs">Agregar integrante</span>
+              </button>
+            </div>
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-400">
+            <span class="w-full sm:w-auto text-[11px] mb-0.5 sm:mb-0">Días laborales:</span>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:border-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-800 transition"><input type="checkbox" class="new-member-dow accent-emerald-500 rounded" value="1" checked /> Lun</label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:border-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-800 transition"><input type="checkbox" class="new-member-dow accent-emerald-500 rounded" value="2" checked /> Mar</label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:border-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-800 transition"><input type="checkbox" class="new-member-dow accent-emerald-500 rounded" value="3" checked /> Mié</label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:border-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-800 transition"><input type="checkbox" class="new-member-dow accent-emerald-500 rounded" value="4" checked /> Jue</label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:border-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-800 transition"><input type="checkbox" class="new-member-dow accent-emerald-500 rounded" value="5" checked /> Vie</label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:border-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-800 transition"><input type="checkbox" class="new-member-dow accent-emerald-500 rounded" value="6" /> Sáb</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Modal -->
+      <div class="px-4 sm:px-6 py-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between gap-3">
+        <span class="text-[11px] sm:text-xs text-slate-400">Guardado automático en este dispositivo.</span>
+        <button onclick="closeTeamModal()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl transition shrink-0">
+          Listo y aplicar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layout principal responsive -->
+  <div class="w-full px-3 sm:px-6 pt-4 sm:pt-6 flex flex-col xl:flex-row items-start gap-5 sm:gap-6">
+
+    <!-- COLUMNA IZQUIERDA -->
+    <main class="w-full xl:max-w-[960px] shrink-0 space-y-5 sm:space-y-6">
+
+      <!-- Paso 1: Carga de Archivo Fudo -->
+      <section class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-4 sm:p-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Paso 1 · Reporte Fudo</span>
+            <h2 class="text-base sm:text-lg font-bold text-white mt-0.5">Sube el archivo exportado de Fudo</h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
+              Lee <code class="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-emerald-300">Fecha</code>, <code class="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-emerald-300">Mesa</code>, <code class="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-emerald-300">Valor</code> y excluye ventas canceladas.
+            </p>
+          </div>
+
+          <label class="w-full md:w-auto cursor-pointer bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-slate-950 font-bold px-5 py-3 rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center justify-center gap-2 shrink-0">
+            <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+            <span>Seleccionar Excel de Fudo</span>
+            <input type="file" id="fudoFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleFileUpload(event)" />
+          </label>
+        </div>
+
+        <!-- Barra de estado de carga -->
+        <div id="fileStatusBar" class="hidden mt-4 pt-3.5 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+          <div class="flex items-center gap-2 text-emerald-400 font-medium min-w-0">
+            <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+            <span id="fileStatusText" class="truncate">Archivo cargado correctamente</span>
+          </div>
+          <button onclick="toggleColumnMapper()" class="text-xs text-slate-400 hover:text-slate-200 underline shrink-0">
+            Ajustes de columnas
+          </button>
+        </div>
+
+        <!-- Mapeador manual -->
+        <div id="columnMapperPanel" class="hidden mt-4 p-3.5 sm:p-4 bg-slate-950 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Columna Fecha y Hora</label>
+            <select id="mapDateCol" onchange="reparseRawRows()" class="w-full border border-slate-700 rounded-lg p-2 bg-slate-900 text-slate-200"></select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Columna Mesa</label>
+            <select id="mapTableCol" onchange="reparseRawRows()" class="w-full border border-slate-700 rounded-lg p-2 bg-slate-900 text-slate-200"></select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Columna ID Venta</label>
+            <select id="mapIdCol" onchange="reparseRawRows()" class="w-full border border-slate-700 rounded-lg p-2 bg-slate-900 text-slate-200"></select>
+          </div>
+          <div>
+            <label class="block font-bold text-emerald-400 mb-1">Columna Propina (Valor)</label>
+            <select id="mapTipCol" onchange="reparseRawRows()" class="w-full border border-emerald-500/50 rounded-lg p-2 bg-emerald-950/40 font-bold text-emerald-300"></select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Contenedor Principal Izquierdo -->
+      <div id="workspaceContainer" class="hidden space-y-5 sm:space-y-6">
+
+        <!-- 1. Resumen Final y Transferencias -->
+        <section class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-4 sm:p-5">
+          <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Resultado · Liquidación Semanal</span>
+              <h2 class="text-base sm:text-lg font-bold text-white mt-0.5">Resumen a transferir por persona</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Incluye horario regular más horas extra asignadas (ajuste por resto mayor).</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-end gap-3">
+              <div class="bg-slate-950/70 sm:bg-transparent border border-slate-800 sm:border-0 rounded-xl p-3 sm:p-0 flex sm:block items-center justify-between sm:text-right">
+                <span class="text-xs text-slate-400 block">Total Fudo (<span id="assignedVsTotalLabel">$0 asignado</span>)</span>
+                <span id="grandTotalDisplay" class="text-xl sm:text-2xl font-bold text-emerald-400 tabular-nums">$0</span>
+              </div>
+
+              <!-- Botones de exportación táctiles -->
+              <div class="grid grid-cols-3 sm:flex items-center gap-2">
+                <button onclick="copySummaryImage()" id="copyImgBtn" class="bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-slate-950 text-xs font-bold px-2.5 sm:px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                  <i data-lucide="clipboard-copy" class="w-4 h-4 shrink-0"></i>
+                  <span>Copiar foto</span>
+                </button>
+
+                <button onclick="downloadSummaryImage()" id="downloadImgBtn" class="bg-slate-800 hover:bg-slate-700 active:scale-[0.98] border border-slate-700 text-white text-xs font-medium px-2.5 sm:px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                  <i data-lucide="download" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                  <span>Bajar foto</span>
+                </button>
+
+                <button onclick="copyWhatsAppSummary()" id="copyBtn" class="bg-slate-800 hover:bg-slate-700 active:scale-[0.98] border border-slate-700 text-white text-xs font-medium px-2.5 sm:px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                  <i data-lucide="copy" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                  <span>Copiar texto</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="payoutCardsGrid" class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4"></div>
+        </section>
+
+        <!-- 2. Auditoría detallada de mesas -->
+        <section id="auditSection" class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-800 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="text-base font-bold text-white">Detalle mesa por mesa · Horario Regular</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Toca un nombre para incluirlo o quitarlo de esa mesa.</p>
+              </div>
+              <div class="flex items-center gap-2.5 text-xs">
+                <span id="filteredSummaryBadge" class="bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg font-medium">
+                  Mostrando todas
+                </span>
+                <button id="clearFiltersBtn" onclick="resetAuditFilters()" class="hidden text-emerald-400 hover:text-emerald-300 underline font-medium">
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            <!-- Barra de filtros siempre visible y cómoda en móvil y escritorio -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              <select id="dayFilterSelect" onchange="renderTablesAudit()" aria-label="Filtrar por día y fecha"
+                class="w-full bg-slate-950 hover:bg-slate-800 text-slate-200 font-semibold text-xs border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-xl px-3 py-2 cursor-pointer transition">
+                <option value="ALL">Todos los días</option>
+              </select>
+
+              <select id="timeSlotFilterSelect" onchange="renderTablesAudit()" aria-label="Filtrar por bloque horario"
+                class="w-full bg-slate-950 hover:bg-slate-800 text-slate-200 font-semibold text-xs border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-xl px-3 py-2 cursor-pointer transition">
+                <option value="ALL">Todos los horarios</option>
+                <option value="09:00-12:00">09:00 a 12:00 (Mañana)</option>
+                <option value="12:00-16:00">12:00 a 16:00 (Almuerzo)</option>
+                <option value="16:00-19:30">16:00 a 19:30 (Tarde)</option>
+                <option value="19:30+">19:30 en adelante</option>
+              </select>
+
+              <select id="personFilterSelect" onchange="renderTablesAudit()" aria-label="Filtrar por participante"
+                class="w-full bg-slate-950 hover:bg-slate-800 text-slate-200 font-semibold text-xs border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-xl px-3 py-2 cursor-pointer transition">
+                <option value="ALL">Todos los participantes</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Vista Tarjetas para Móvil (< md) -->
+          <div id="auditMobileCards" class="md:hidden divide-y divide-slate-800/80 max-h-[540px] overflow-y-auto"></div>
+
+          <!-- Vista Tabla para Tablet/Desktop (>= md) -->
+          <div class="hidden md:block overflow-x-auto max-h-[600px]">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead class="bg-slate-950 text-slate-400 text-xs uppercase sticky top-0 z-10 border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Día y Fecha</th>
+                  <th class="py-3 px-4">Hora</th>
+                  <th class="py-3 px-4">Mesa / ID</th>
+                  <th class="py-3 px-4 text-right">Propina</th>
+                  <th class="py-3 px-4">Participantes</th>
+                  <th class="py-3 px-4 text-right">Por persona</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody" class="divide-y divide-slate-800/80"></tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- COLUMNA DERECHA: Horas Extra + Horarios y Excepciones -->
+    <aside id="rightWorkspaceSlot" class="hidden w-full xl:flex-1 xl:min-w-[500px] space-y-5 sm:space-y-6">
+
+      <!-- 1. Tarjeta Superior Permanente: Total Generado Fuera de Horario -->
+      <section id="overtimeHeaderCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg transition-colors">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-start gap-2.5 sm:gap-3 min-w-0">
+            <div id="overtimeIconBox" class="bg-slate-800 border border-slate-700 p-2 sm:p-2.5 rounded-xl text-slate-400 shrink-0">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <span id="overtimeKicker" class="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 block">Registro Aparte</span>
+              <h2 class="text-base sm:text-lg font-bold text-white leading-snug">Horas Extra (Fuera de horario)</h2>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="text-[11px] text-slate-400 block">Total generado</span>
+            <span id="overtimeGrossTotal" class="text-xl sm:text-2xl font-bold text-white tabular-nums">$0</span>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span id="overtimeStatusPill" class="px-2.5 py-1 rounded-full font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+              0 mesas registradas
+            </span>
+          </div>
+          <div id="overtimeBreakdownText" class="text-slate-400 tabular-nums">
+            Asignado: <strong class="text-emerald-400">$0</strong> · Pendiente: <strong class="text-slate-300">$0</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Tabla/Tarjetas Auditoría Independiente de Horas Extra -->
+      <section class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 overflow-hidden">
+        <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h3 class="text-sm font-bold text-white">Auditoría · Ventas Pasado el Horario</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Selecciona quiénes participaron para sumarlo a su liquidación.</p>
+          </div>
+          <select id="overtimeStatusFilter" onchange="renderOvertimeAudit()"
+            class="w-full sm:w-auto bg-slate-950 hover:bg-slate-800 text-slate-200 font-semibold text-xs border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-xl px-3 py-2 cursor-pointer">
+            <option value="ALL">Todas (Pendientes y Asignadas)</option>
+            <option value="PENDING">Solo pendientes</option>
+            <option value="ASSIGNED">Solo asignadas</option>
+          </select>
+        </div>
+
+        <!-- Vista Móvil Horas Extra (< md) -->
+        <div id="overtimeMobileCards" class="md:hidden divide-y divide-slate-800/80 max-h-[420px] overflow-y-auto"></div>
+
+        <!-- Vista Tabla Desktop Horas Extra (>= md) -->
+        <div class="hidden md:block overflow-x-auto max-h-[380px]">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead class="bg-slate-950 text-slate-400 text-xs uppercase sticky top-0 z-10 border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">Día y Hora</th>
+                <th class="py-2.5 px-3">Mesa</th>
+                <th class="py-2.5 px-3 text-right">Propina</th>
+                <th class="py-2.5 px-3">Beneficiarios</th>
+                <th class="py-2.5 px-3 text-right">C/U</th>
+              </tr>
+            </thead>
+            <tbody id="overtimeAuditBody" class="divide-y divide-slate-800/80"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 3. Grilla Semanal de Asistencia y Excepciones -->
+      <section class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-4 sm:p-5">
+        <div onclick="toggleScheduleSection()" class="flex items-center justify-between gap-3 cursor-pointer select-none group">
+          <div class="min-w-0">
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Control de Presencia</span>
+            <h2 class="text-base font-bold text-white mt-0.5 group-hover:text-emerald-300 transition">Horarios y excepciones de la semana</h2>
+            <p class="text-xs text-slate-400">Apaga a quien faltó, ajusta horas o agrega un reemplazo.</p>
+          </div>
+          <button type="button" id="toggleScheduleBtn" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+            <i data-lucide="chevron-up" class="w-4 h-4 text-emerald-400"></i>
+            <span>Contraer</span>
+          </button>
+        </div>
+
+        <div id="daysScheduleBody" class="mt-4 pt-4 border-t border-slate-800/80">
+          <div id="daysScheduleGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
+        </div>
+      </section>
+
+    </aside>
+
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. CONFIGURACIÓN BASE DEL EQUIPO Y MOTOR DE COLORES PERSONALIZADOS
+    // =========================================================================
+    const COLOR_PALETTE = [
+      { id: 'blue',    label: 'Azul',      hex: '#3b82f6' },
+      { id: 'purple',  label: 'Morado',    hex: '#a855f7' },
+      { id: 'amber',   label: 'Ámbar',     hex: '#f59e0b' },
+      { id: 'emerald', label: 'Esmeralda', hex: '#10b981' },
+      { id: 'rose',    label: 'Rosa',      hex: '#f43f5e' },
+      { id: 'cyan',    label: 'Cian',      hex: '#06b6d4' }
+    ];
+
+    const DEFAULT_TEAM_MEMBERS = [
+      { id: 'emp_1', name: 'Sebastián', colorIdx: 0, customHex: null },
+      { id: 'emp_2', name: 'Constanza', colorIdx: 1, customHex: null },
+      { id: 'emp_3', name: 'Ignacio',   colorIdx: 2, customHex: null },
+      { id: 'emp_4', name: 'Benjamín',  colorIdx: 3, customHex: null }
+    ];
+
+    const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const SHORT_DAY_NAMES = { 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
+
+    const DEFAULT_WEEKLY_TEMPLATE = {
+      1: [
+        { name: 'Benjamín',  active: true, start: '09:30', end: '19:30' },
+        { name: 'Sebastián', active: true, start: '09:40', end: '19:30' },
+        { name: 'Ignacio',   active: true, start: '10:30', end: '18:40' }
+      ],
+      2: [
+        { name: 'Sebastián', active: true, start: '09:40', end: '19:30' },
+        { name: 'Constanza', active: true, start: '09:40', end: '19:30' },
+        { name: 'Ignacio',   active: true, start: '10:30', end: '18:40' }
+      ],
+      3: [
+        { name: 'Sebastián', active: true, start: '09:40', end: '19:30' },
+        { name: 'Constanza', active: true, start: '09:40', end: '19:30' },
+        { name: 'Ignacio',   active: true, start: '10:30', end: '18:40' }
+      ],
+      4: [
+        { name: 'Benjamín',  active: true, start: '09:30', end: '19:30' },
+        { name: 'Constanza', active: true, start: '09:40', end: '19:30' },
+        { name: 'Ignacio',   active: true, start: '10:30', end: '18:40' }
+      ],
+      5: [
+        { name: 'Sebastián', active: true, start: '09:40', end: '19:30' },
+        { name: 'Constanza', active: true, start: '09:40', end: '19:30' },
+        { name: 'Ignacio',   active: true, start: '10:30', end: '18:40' }
+      ],
+      6: [
+        { name: 'Sebastián', active: true, start: '10:30', end: '18:00' },
+        { name: 'Constanza', active: true, start: '10:30', end: '18:00' },
+        { name: 'Ignacio',   active: true, start: '10:30', end: '18:00' }
+      ],
+      0: []
+    };
+
+    let state = {
+      rawRows: [],
+      headers: [],
+      lastFileName: 'Archivo Fudo',
+      sales: [],
+      daySchedules: {},
+      teamMembers: JSON.parse(JSON.stringify(DEFAULT_TEAM_MEMBERS)),
+      savedTemplate: null,
+      payouts: [],
+      outOfHoursSales: [],
+      isScheduleCollapsed: false
+    };
+
+    function normalizeHex(hex) {
+      if (!hex) return null;
+      let clean = String(hex).trim();
+      if (!clean.startsWith('#')) clean = '#' + clean;
+      if (/^#[0-9A-Fa-f]{3}$/.test(clean)) {
+        clean = '#' + clean[1] + clean[1] + clean[2] + clean[2] + clean[3] + clean[3];
+      }
+      return /^#[0-9A-Fa-f]{6}$/.test(clean) ? clean.toLowerCase() : null;
+    }
+
+    function buildColorThemeFromHex(hexStr) {
+      const hex = normalizeHex(hexStr) || '#10b981';
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+
+      const lr = Math.round(r + (255 - r) * 0.48);
+      const lg = Math.round(g + (255 - g) * 0.48);
+      const lb = Math.round(b + (255 - b) * 0.48);
+      const lightText = `rgb(${lr}, ${lg}, ${lb})`;
+
+      return {
+        rawHex: hex,
+        lightText,
+        badgeBg: `rgba(${r}, ${g}, ${b}, 0.18)`,
+        badgeBgSoft: `rgba(${r}, ${g}, ${b}, 0.08)`,
+        badgeBorder: `rgba(${r}, ${g}, ${b}, 0.45)`,
+        cardBorder: `rgba(${r}, ${g}, ${b}, 0.35)`,
+        glowShadow: `0 6px 24px -6px rgba(${r}, ${g}, ${b}, 0.18)`,
+        badgeInlineStyle: `background-color: rgba(${r}, ${g}, ${b}, 0.18); color: ${lightText}; border-color: rgba(${r}, ${g}, ${b}, 0.45);`
+      };
+    }
+
+    function getPersonTheme(name) {
+      const idx = state.teamMembers.findIndex(m => m.name.toLowerCase() === name.toLowerCase());
+      if (idx !== -1) {
+        const member = state.teamMembers[idx];
+        const validCustom = normalizeHex(member.customHex);
+        if (validCustom) {
+          return buildColorThemeFromHex(validCustom);
+        }
+        const paletteEntry = COLOR_PALETTE[(member.colorIdx || 0) % COLOR_PALETTE.length];
+        return buildColorThemeFromHex(paletteEntry.hex);
+      }
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      const paletteEntry = COLOR_PALETTE[Math.abs(hash) % COLOR_PALETTE.length];
+      return buildColorThemeFromHex(paletteEntry.hex);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const storedMembers = localStorage.getItem('fudo_tips_team_v1');
+      if (storedMembers) {
+        try {
+          const parsed = JSON.parse(storedMembers);
+          if (Array.isArray(parsed) && parsed.length > 0) state.teamMembers = parsed;
+        } catch (e) {}
+      }
+
+      const storedTpl = localStorage.getItem('fudo_tips_template_v2');
+      if (storedTpl) {
+        try { state.savedTemplate = JSON.parse(storedTpl); } catch (e) {}
+      }
+
+      updateNavTeamCount();
+      lucide.createIcons();
+    });
+
+    function updateNavTeamCount() {
+      const el = document.getElementById('navTeamCount');
+      if (el) el.textContent = state.teamMembers.length;
+    }
+
+    function persistTeamConfig() {
+      localStorage.setItem('fudo_tips_team_v1', JSON.stringify(state.teamMembers));
+      const tpl = state.savedTemplate || JSON.parse(JSON.stringify(DEFAULT_WEEKLY_TEMPLATE));
+      localStorage.setItem('fudo_tips_template_v2', JSON.stringify(tpl));
+      updateNavTeamCount();
+    }
+
+    // =========================================================================
+    // MODAL DE GESTIÓN DE EQUIPO Y TURNOS BASE
+    // =========================================================================
+    function openTeamModal() {
+      renderTeamModalContent();
+      document.getElementById('teamModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeTeamModal() {
+      document.getElementById('teamModal').classList.add('hidden');
+    }
+
+    function renderTeamModalContent() {
+      const container = document.getElementById('teamMembersList');
+      container.innerHTML = '';
+      const tpl = state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE;
+
+      state.teamMembers.forEach((member, idx) => {
+        const theme = getPersonTheme(member.name);
+        const isCustom = Boolean(normalizeHex(member.customHex));
+
+        const daysBadges = [1, 2, 3, 4, 5, 6].map(dow => {
+          const shift = (tpl[dow] || []).find(s => s.name === member.name);
+          const isAssigned = Boolean(shift);
+          return `
+            <button type="button" onclick="toggleMemberBaseDay(${idx}, ${dow})"
+              title="${isAssigned ? `Turno ${shift.start} - ${shift.end} (Toca para quitar)` : 'Toca para asignar día'}"
+              class="px-2.5 py-1 rounded-lg text-[11px] font-medium border transition ${
+                isAssigned
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+              }">
+              ${SHORT_DAY_NAMES[dow]}${isAssigned ? ` · ${shift.start}-${shift.end}` : ''}
+            </button>
+          `;
+        }).join('');
+
+        const row = document.createElement('div');
+        row.className = 'bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 space-y-2.5 relative overflow-hidden';
+        row.style.borderColor = theme.cardBorder;
+
+        row.innerHTML = `
+          <div class="absolute left-0 top-0 bottom-0 w-1" style="background-color: ${theme.rawHex};"></div>
+          <div class="flex flex-wrap items-center justify-between gap-2 pl-1.5">
+            <div class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+              <button type="button" onclick="cycleMemberColor(${idx})" title="Rotar color de paleta"
+                style="${theme.badgeInlineStyle}"
+                class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition hover:brightness-110">
+                <i data-lucide="palette" class="w-4 h-4"></i>
+              </button>
+
+              <input type="text" value="${member.name}" onchange="renameTeamMember(${idx}, this.value)"
+                class="bg-slate-900 border border-slate-700 focus:border-emerald-500 focus:outline-none rounded-lg px-3 py-1.5 text-sm font-semibold text-white flex-1 min-w-[130px] max-w-[200px]" />
+
+              <!-- Selector de color HEX exclusivo -->
+              <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1" title="Color específico solo para ${member.name}">
+                <input type="color" value="${theme.rawHex}" onchange="setMemberCustomHex(${idx}, this.value)"
+                  class="w-5 h-5 cursor-pointer rounded shrink-0" />
+                <input type="text" value="${theme.rawHex}" maxlength="7" onchange="setMemberCustomHex(${idx}, this.value)"
+                  placeholder="#10b981"
+                  class="w-[68px] bg-transparent text-xs font-mono text-slate-300 focus:text-white focus:outline-none uppercase" />
+                ${isCustom ? `
+                  <button type="button" onclick="clearMemberCustomHex(${idx})" title="Volver a color de paleta"
+                    class="text-slate-500 hover:text-slate-300 transition p-0.5">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                  </button>
+                ` : ''}
+              </div>
+
+              ${idx < 4
+                ? '<span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">Base #' + (idx + 1) + '</span>'
+                : '<span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Extra</span>'}
+            </div>
+
+            ${state.teamMembers.length > 1 ? `
+              <button type="button" onclick="removeTeamMember(${idx})" title="Eliminar empleado"
+                class="text-xs text-slate-400 hover:text-rose-400 p-2 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1 shrink-0">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5 pt-1 pl-1.5">
+            <span class="text-[11px] text-slate-500 mr-1">Turnos base:</span>
+            ${daysBadges}
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function cycleMemberColor(idx) {
+      state.teamMembers[idx].customHex = null;
+      state.teamMembers[idx].colorIdx = ((state.teamMembers[idx].colorIdx || 0) + 1) % COLOR_PALETTE.length;
+      persistTeamConfig();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function setMemberCustomHex(idx, rawHex) {
+      const valid = normalizeHex(rawHex);
+      if (!valid) {
+        alert('Ingresa un código de color hexadecimal válido (ej: #38bdf8).');
+        renderTeamModalContent();
+        lucide.createIcons();
+        return;
+      }
+      state.teamMembers[idx].customHex = valid;
+      persistTeamConfig();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function clearMemberCustomHex(idx) {
+      state.teamMembers[idx].customHex = null;
+      persistTeamConfig();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function renameTeamMember(idx, rawNewName) {
+      const newName = rawNewName.trim();
+      const oldName = state.teamMembers[idx].name;
+      if (!newName || newName === oldName) {
+        renderTeamModalContent();
+        return;
+      }
+      if (state.teamMembers.some((m, i) => i !== idx && m.name.toLowerCase() === newName.toLowerCase())) {
+        alert('Ya existe un integrante con ese nombre.');
+        renderTeamModalContent();
+        return;
+      }
+
+      state.teamMembers[idx].name = newName;
+
+      const tpl = JSON.parse(JSON.stringify(state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE));
+      Object.keys(tpl).forEach(dow => {
+        tpl[dow].forEach(slot => {
+          if (slot.name === oldName) slot.name = newName;
+        });
+      });
+      state.savedTemplate = tpl;
+
+      Object.values(state.daySchedules).forEach(dayObj => {
+        dayObj.staff.forEach(p => {
+          if (p.name === oldName) p.name = newName;
+        });
+      });
+
+      state.sales.forEach(sale => {
+        if (Array.isArray(sale.manualParticipants)) {
+          sale.manualParticipants = sale.manualParticipants.map(n => n === oldName ? newName : n);
+        }
+      });
+
+      persistTeamConfig();
+      refreshPersonFilterOptions();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function toggleMemberBaseDay(idx, dow) {
+      const memberName = state.teamMembers[idx].name;
+      const tpl = JSON.parse(JSON.stringify(state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE));
+      const list = tpl[dow] || [];
+      const existingIdx = list.findIndex(s => s.name === memberName);
+
+      const defaultStart = dow === 6 ? '10:30' : '09:40';
+      const defaultEnd   = dow === 6 ? '18:00' : '19:30';
+
+      if (existingIdx > -1) {
+        list.splice(existingIdx, 1);
+      } else {
+        list.push({ name: memberName, active: true, start: defaultStart, end: defaultEnd });
+      }
+      tpl[dow] = list;
+      state.savedTemplate = tpl;
+
+      Object.values(state.daySchedules).forEach(dayObj => {
+        if (dayObj.dow === dow) {
+          const dayIdx = dayObj.staff.findIndex(p => p.name === memberName);
+          if (existingIdx > -1 && dayIdx > -1) {
+            dayObj.staff.splice(dayIdx, 1);
+          } else if (existingIdx === -1 && dayIdx === -1) {
+            dayObj.staff.push({ name: memberName, active: true, start: defaultStart, end: defaultEnd });
+          }
+          clearManualOverridesForDate(dayObj.dateKey);
+        }
+      });
+
+      persistTeamConfig();
+      refreshPersonFilterOptions();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function addNewTeamMember() {
+      const nameInput = document.getElementById('newMemberName');
+      const startVal  = document.getElementById('newMemberStart').value || '09:40';
+      const endVal    = document.getElementById('newMemberEnd').value || '19:30';
+      const name      = nameInput.value.trim();
+
+      if (!name) {
+        alert('Escribe el nombre del nuevo integrante.');
+        nameInput.focus();
+        return;
+      }
+      if (state.teamMembers.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+        alert('Ese nombre ya está en el equipo.');
+        return;
+      }
+
+      const selectedDows = Array.from(document.querySelectorAll('.new-member-dow:checked')).map(cb => Number(cb.value));
+      const newColorIdx = state.teamMembers.length % COLOR_PALETTE.length;
+
+      state.teamMembers.push({
+        id: 'emp_' + Date.now(),
+        name,
+        colorIdx: newColorIdx,
+        customHex: null
+      });
+
+      const tpl = JSON.parse(JSON.stringify(state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE));
+      selectedDows.forEach(dow => {
+        if (!tpl[dow]) tpl[dow] = [];
+        tpl[dow].push({ name, active: true, start: startVal, end: endVal });
+      });
+      state.savedTemplate = tpl;
+
+      Object.values(state.daySchedules).forEach(dayObj => {
+        if (selectedDows.includes(dayObj.dow)) {
+          dayObj.staff.push({ name, active: true, start: startVal, end: endVal });
+          clearManualOverridesForDate(dayObj.dateKey);
+        }
+      });
+
+      nameInput.value = '';
+      persistTeamConfig();
+      refreshPersonFilterOptions();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function removeTeamMember(idx) {
+      const member = state.teamMembers[idx];
+      if (!confirm(`¿Quitar a "${member.name}" de la plantilla del equipo?`)) return;
+
+      state.teamMembers.splice(idx, 1);
+
+      const tpl = JSON.parse(JSON.stringify(state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE));
+      Object.keys(tpl).forEach(dow => {
+        tpl[dow] = tpl[dow].filter(s => s.name !== member.name);
+      });
+      state.savedTemplate = tpl;
+
+      Object.values(state.daySchedules).forEach(dayObj => {
+        dayObj.staff = dayObj.staff.filter(p => p.name !== member.name);
+        clearManualOverridesForDate(dayObj.dateKey);
+      });
+
+      persistTeamConfig();
+      refreshPersonFilterOptions();
+      renderTeamModalContent();
+      if (state.sales.length > 0) recalculateAll();
+      lucide.createIcons();
+    }
+
+    function toggleScheduleSection() {
+      state.isScheduleCollapsed = !state.isScheduleCollapsed;
+      const body = document.getElementById('daysScheduleBody');
+      const btn  = document.getElementById('toggleScheduleBtn');
+
+      if (state.isScheduleCollapsed) {
+        body.classList.add('hidden');
+        btn.innerHTML = `<i data-lucide="chevron-down" class="w-4 h-4 text-emerald-400"></i><span>Expandir</span>`;
+      } else {
+        body.classList.remove('hidden');
+        btn.innerHTML = `<i data-lucide="chevron-up" class="w-4 h-4 text-emerald-400"></i><span>Contraer</span>`;
+      }
+      lucide.createIcons();
+    }
+
+    function getTemplateForDow(dow) {
+      const source = state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE;
+      return JSON.parse(JSON.stringify(source[dow] || []));
+    }
+
+    function saveCurrentAsTemplate() {
+      const tpl = JSON.parse(JSON.stringify(state.savedTemplate || DEFAULT_WEEKLY_TEMPLATE));
+      Object.values(state.daySchedules).forEach(dayObj => {
+        tpl[dayObj.dow] = JSON.parse(JSON.stringify(dayObj.staff));
+      });
+      state.savedTemplate = tpl;
+      localStorage.setItem('fudo_tips_template_v2', JSON.stringify(tpl));
+    }
+
+    function resetScheduleToDefault() {
+      if (!confirm('¿Restaurar los 4 empleados y sus horarios base originales?')) return;
+      localStorage.removeItem('fudo_tips_template_v1');
+      localStorage.removeItem('fudo_tips_template_v2');
+      localStorage.removeItem('fudo_tips_team_v1');
+      state.savedTemplate = null;
+      state.teamMembers = JSON.parse(JSON.stringify(DEFAULT_TEAM_MEMBERS));
+      updateNavTeamCount();
+
+      if (state.sales.length > 0) {
+        state.sales.forEach(s => { s.manualParticipants = null; });
+        buildDaySchedulesFromSales();
+        recalculateAll();
+      }
+      if (!document.getElementById('teamModal').classList.contains('hidden')) {
+        renderTeamModalContent();
+        lucide.createIcons();
+      }
+    }
+
+    // =========================================================================
+    // 2. LECTURA CALIBRADA PARA FUDO
+    // =========================================================================
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      state.lastFileName = file.name;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        const matrix = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+        if (!matrix || matrix.length === 0) {
+          alert('El archivo parece estar vacío.');
+          return;
+        }
+
+        let headerRowIdx = 0;
+        for (let r = 0; r < Math.min(matrix.length, 30); r++) {
+          const rowLower = matrix[r].map(c => String(c || '').toLowerCase().trim());
+          if (rowLower.includes('fecha') && (rowLower.includes('valor') || rowLower.includes('total venta') || rowLower.includes('mesa'))) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+
+        const headerRow = matrix[headerRowIdx];
+        const colMap = [];
+        headerRow.forEach((cell, idx) => {
+          const name = String(cell || '').trim();
+          if (name) colMap.push({ idx, name });
+        });
+
+        const rows = [];
+        for (let r = headerRowIdx + 1; r < matrix.length; r++) {
+          const rawRow = matrix[r];
+          if (!rawRow || rawRow.every(c => String(c || '').trim() === '')) continue;
+          const obj = {};
+          colMap.forEach(c => { obj[c.name] = rawRow[c.idx]; });
+          rows.push(obj);
+        }
+
+        state.rawRows = rows;
+        state.headers = colMap.map(c => c.name);
+        autoDetectColumns(state.headers);
+        reparseRawRows(file.name);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function autoDetectColumns(headers) {
+      const findExactOrPartial = (targets) => {
+        for (const t of targets) {
+          const exact = headers.find(h => h.toLowerCase().trim() === t);
+          if (exact) return exact;
+        }
+        for (const t of targets) {
+          const partial = headers.find(h => h.toLowerCase().trim().includes(t));
+          if (partial) return partial;
+        }
+        return headers[0] || '';
+      };
+
+      const dateCol  = findExactOrPartial(['fecha']);
+      const tableCol = findExactOrPartial(['mesa']);
+      const idCol    = findExactOrPartial(['id de venta', 'id']);
+      const tipCol   = findExactOrPartial(['valor', 'propina']);
+
+      const fill = (id, selected) => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '';
+        headers.forEach(h => {
+          const opt = document.createElement('option');
+          opt.value = h;
+          opt.textContent = h;
+          if (h === selected) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      };
+
+      fill('mapDateCol', dateCol);
+      fill('mapTableCol', tableCol);
+      fill('mapIdCol', idCol);
+      fill('mapTipCol', tipCol);
+    }
+
+    function toggleColumnMapper() {
+      document.getElementById('columnMapperPanel').classList.toggle('hidden');
+    }
+
+    function parseMoney(val) {
+      if (typeof val === 'number') return Math.round(val);
+      if (val === null || val === undefined || val === '') return 0;
+      let str = String(val).trim();
+      if (str.includes(',') && str.includes('.')) {
+        str = str.replace(/\./g, '').replace(',', '.');
+      } else if (str.includes('.')) {
+        const parts = str.split('.');
+        if (parts[parts.length - 1].length === 3) str = str.replace(/\./g, '');
+      } else if (str.includes(',')) {
+        const parts = str.split(',');
+        if (parts[parts.length - 1].length === 3) str = str.replace(/,/g, '');
+        else str = str.replace(',', '.');
+      }
+      const cleaned = str.replace(/[^0-9.-]/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : Math.round(num);
+    }
+
+    function parseFudoDateTime(val) {
+      if (!val) return null;
+      if (val instanceof Date && !isNaN(val)) return val;
+
+      const str = String(val).trim();
+      const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+      if (dmyMatch) {
+        let [, d, m, y, hh = '12', mm = '00', ss = '00'] = dmyMatch;
+        if (y.length === 2) y = '20' + y;
+        return new Date(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss));
+      }
+      const parsed = new Date(str);
+      return isNaN(parsed) ? null : parsed;
+    }
+
+    function formatDateKey(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function formatTimeHHMM(dateObj) {
+      const hh = String(dateObj.getHours()).padStart(2, '0');
+      const mm = String(dateObj.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
+
+    function reparseRawRows(fileName = state.lastFileName) {
+      const dateCol  = document.getElementById('mapDateCol').value;
+      const tableCol = document.getElementById('mapTableCol').value;
+      const idCol    = document.getElementById('mapIdCol').value;
+      const tipCol   = document.getElementById('mapTipCol').value;
+
+      const parsedSales = [];
+      let canceledCount = 0;
+
+      state.rawRows.forEach((row, index) => {
+        const cancelVal = String(row['Cancelada'] || '').toLowerCase().trim();
+        if (cancelVal === 'sí' || cancelVal === 'si' || cancelVal === 'true') {
+          canceledCount++;
+          return;
+        }
+
+        const tipAmount = parseMoney(row[tipCol]);
+        if (tipAmount <= 0) return;
+
+        const dt = parseFudoDateTime(row[dateCol]);
+        if (!dt) return;
+
+        const mesaVal = row[tableCol] !== undefined && row[tableCol] !== '' ? String(row[tableCol]).trim() : '';
+        const idVal   = row[idCol] !== undefined && row[idCol] !== '' ? String(row[idCol]).trim() : `${index + 1}`;
+        const label   = mesaVal ? `Mesa ${mesaVal}` : `Venta #${idVal}`;
+
+        parsedSales.push({
+          id: `sale_${idVal}_${index}`,
+          dateKey: formatDateKey(dt),
+          dow: dt.getDay(),
+          time: formatTimeHHMM(dt),
+          table: label,
+          tip: tipAmount,
+          manualParticipants: null
+        });
+      });
+
+      document.getElementById('fileStatusBar').classList.remove('hidden');
+
+      if (parsedSales.length === 0) {
+        document.getElementById('fileStatusText').textContent = `No se encontraron ventas válidas con propina > $0.`;
+        document.getElementById('columnMapperPanel').classList.remove('hidden');
+        return;
+      }
+
+      parsedSales.sort((a, b) => (a.dateKey + a.time).localeCompare(b.dateKey + b.time));
+      state.sales = parsedSales;
+
+      const cancelMsg = canceledCount > 0 ? ` (${canceledCount} canceladas excluidas)` : '';
+      document.getElementById('fileStatusText').textContent = `${fileName}: ${parsedSales.length} ventas cargadas${cancelMsg}`;
+      document.getElementById('workspaceContainer').classList.remove('hidden');
+      document.getElementById('rightWorkspaceSlot').classList.remove('hidden');
+
+      buildDaySchedulesFromSales();
+      recalculateAll();
+    }
+
+    // =========================================================================
+    // 3. GESTIÓN DE HORARIOS POR DÍA, REEMPLAZOS Y FILTROS
+    // =========================================================================
+    function buildDaySchedulesFromSales() {
+      const uniqueDates = {};
+      state.sales.forEach(s => {
+        if (!uniqueDates[s.dateKey]) {
+          uniqueDates[s.dateKey] = {
+            dateKey: s.dateKey,
+            dow: s.dow,
+            dayName: DAY_NAMES[s.dow],
+            staff: getTemplateForDow(s.dow)
+          };
+        }
+      });
+      state.daySchedules = uniqueDates;
+
+      const daySel = document.getElementById('dayFilterSelect');
+      const prevDayVal = daySel.value;
+      daySel.innerHTML = '<option value="ALL">Todos los días</option>';
+      Object.values(uniqueDates).forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.dateKey;
+        opt.textContent = `${d.dayName} (${d.dateKey.split('-').reverse().join('/')})`;
+        daySel.appendChild(opt);
+      });
+      if ([...daySel.options].some(o => o.value === prevDayVal)) {
+        daySel.value = prevDayVal;
+      }
+
+      refreshPersonFilterOptions();
+    }
+
+    function refreshPersonFilterOptions() {
+      const personSel = document.getElementById('personFilterSelect');
+      if (!personSel) return;
+      const prevPersonVal = personSel.value;
+      const allNames = new Set(state.teamMembers.map(m => m.name));
+
+      Object.values(state.daySchedules).forEach(d => {
+        d.staff.forEach(p => allNames.add(p.name));
+      });
+
+      personSel.innerHTML = '<option value="ALL">Todos los participantes</option>';
+      allNames.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = `Solo ${name}`;
+        personSel.appendChild(opt);
+      });
+      if ([...personSel.options].some(o => o.value === prevPersonVal)) {
+        personSel.value = prevPersonVal;
+      }
+    }
+
+    function resetAuditFilters() {
+      document.getElementById('dayFilterSelect').value = 'ALL';
+      document.getElementById('timeSlotFilterSelect').value = 'ALL';
+      document.getElementById('personFilterSelect').value = 'ALL';
+      renderTablesAudit();
+    }
+
+    function toggleStaffActive(dateKey, staffIdx) {
+      const person = state.daySchedules[dateKey].staff[staffIdx];
+      person.active = !person.active;
+      clearManualOverridesForDate(dateKey);
+      recalculateAll();
+    }
+
+    function updateStaffTime(dateKey, staffIdx, field, newVal) {
+      state.daySchedules[dateKey].staff[staffIdx][field] = newVal;
+      saveCurrentAsTemplate();
+      clearManualOverridesForDate(dateKey);
+      recalculateAll();
+    }
+
+    function addReplacementStaff(dateKey) {
+      const name = prompt('Nombre del reemplazo o integrante adicional solo para este día:');
+      if (!name || !name.trim()) return;
+      state.daySchedules[dateKey].staff.push({
+        name: name.trim(),
+        active: true,
+        start: '09:40',
+        end: '19:30',
+        isReplacement: true
+      });
+      refreshPersonFilterOptions();
+      clearManualOverridesForDate(dateKey);
+      recalculateAll();
+    }
+
+    function clearManualOverridesForDate(dateKey) {
+      state.sales.forEach(s => {
+        if (s.dateKey === dateKey) s.manualParticipants = null;
+      });
+    }
+
+    function toggleTableParticipant(saleId, personName) {
+      const sale = state.sales.find(s => s.id === saleId);
+      if (!sale) return;
+
+      if (!sale.manualParticipants) {
+        sale.manualParticipants = [...sale.computedParticipants];
+      }
+
+      const idx = sale.manualParticipants.indexOf(personName);
+      if (idx > -1) {
+        if (sale.manualParticipants.length === 1 && !sale.isOutOfHours) {
+          alert('Cada mesa dentro del horario normal debe tener al menos 1 participante.');
+          return;
+        }
+        sale.manualParticipants.splice(idx, 1);
+      } else {
+        sale.manualParticipants.push(personName);
+      }
+      recalculateAll();
+    }
+
+    // =========================================================================
+    // 4. MOTOR DE CÁLCULO (SEPARA HORARIO REGULAR DE HORAS EXTRA)
+    // =========================================================================
+    function timeToMinutes(hhmm) {
+      const [h, m] = hhmm.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function recalculateAll() {
+      const rawTotals = {};
+      const tableCounts = {};
+      let grandTotal = 0;
+      let assignedTotal = 0;
+      const outOfHoursList = [];
+
+      state.teamMembers.forEach(m => {
+        rawTotals[m.name] = 0;
+        tableCounts[m.name] = 0;
+      });
+
+      Object.values(state.daySchedules).forEach(dayObj => {
+        dayObj.staff.forEach(p => {
+          if (!(p.name in rawTotals)) {
+            rawTotals[p.name] = 0;
+            tableCounts[p.name] = 0;
+          }
+        });
+      });
+
+      state.sales.forEach(sale => {
+        grandTotal += sale.tip;
+        const dayObj = state.daySchedules[sale.dateKey];
+        const saleMins = timeToMinutes(sale.time);
+
+        const scheduledMatches = dayObj
+          ? dayObj.staff
+              .filter(p => p.active && saleMins >= timeToMinutes(p.start) && saleMins < timeToMinutes(p.end))
+              .map(p => p.name)
+          : [];
+
+        sale.isOutOfHours = scheduledMatches.length === 0;
+
+        if (sale.isOutOfHours) {
+          outOfHoursList.push(sale);
+        }
+
+        const participants = sale.manualParticipants !== null
+          ? sale.manualParticipants
+          : scheduledMatches;
+
+        sale.computedParticipants = participants;
+
+        if (participants.length > 0) {
+          assignedTotal += sale.tip;
+          const share = sale.tip / participants.length;
+          participants.forEach(name => {
+            rawTotals[name] = (rawTotals[name] || 0) + share;
+            tableCounts[name] = (tableCounts[name] || 0) + 1;
+          });
+        }
+      });
+
+      state.outOfHoursSales = outOfHoursList;
+
+      const entries = Object.keys(rawTotals).map(name => {
+        const exact = rawTotals[name];
+        const floored = Math.floor(exact);
+        return {
+          name,
+          exact,
+          amount: floored,
+          remainder: exact - floored,
+          tables: tableCounts[name] || 0
+        };
+      });
+
+      const sumFloored = entries.reduce((acc, e) => acc + e.amount, 0);
+      let diff = assignedTotal - sumFloored;
+
+      entries.sort((a, b) => b.remainder - a.remainder);
+      for (let i = 0; i < entries.length && diff > 0; i++) {
+        entries[i].amount += 1;
+        diff -= 1;
+      }
+
+      entries.sort((a, b) => b.amount - a.amount);
+      state.payouts = entries;
+
+      renderOvertimePanel();
+      renderOvertimeAudit();
+      renderPayoutCards(grandTotal, assignedTotal);
+      renderTablesAudit();
+      renderDaysSchedule();
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // 5. GENERACIÓN DE FOTO ÚNICA (COPIAR Y DESCARGAR POR SEPARADO)
+    // =========================================================================
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function buildSummaryCanvas() {
+      const activePayouts = state.payouts.filter(p => p.amount > 0 || p.tables > 0);
+      if (activePayouts.length === 0) {
+        alert('Aún no hay montos asignados para generar la imagen.');
+        return null;
+      }
+
+      const dates = Object.keys(state.daySchedules).sort();
+      const rangeStr = dates.length > 0
+        ? `${dates[0].split('-').reverse().join('/')} al ${dates[dates.length - 1].split('-').reverse().join('/')}`
+        : 'Semana';
+
+      const assignedTotal = activePayouts.reduce((acc, p) => acc + p.amount, 0);
+      const pendingTotal  = state.outOfHoursSales
+        .filter(s => s.computedParticipants.length === 0)
+        .reduce((acc, s) => acc + s.tip, 0);
+
+      const scale = 2;
+      const width = 560;
+      const rowHeight = 68;
+      const headerHeight = 115;
+      const footerHeight = pendingTotal > 0 ? 96 : 72;
+      const height = headerHeight + (activePayouts.length * rowHeight) + footerHeight;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, width, height);
+
+      roundRect(ctx, 14, 14, width - 28, height - 28, 18);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#1e293b';
+      ctx.stroke();
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillText('RESUMEN DE PROPINAS', 34, 44);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 21px Inter, sans-serif';
+      ctx.fillText('Liquidación Semanal', 34, 70);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '13px Inter, sans-serif';
+      ctx.fillText(`Período: ${rangeStr}`, 34, 91);
+
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(34, 108);
+      ctx.lineTo(width - 34, 108);
+      ctx.stroke();
+
+      let y = 122;
+      activePayouts.forEach(p => {
+        const theme = getPersonTheme(p.name);
+        const pct = assignedTotal > 0 ? ((p.amount / assignedTotal) * 100).toFixed(1) : '0.0';
+
+        roundRect(ctx, 34, y, width - 68, 56, 12);
+        ctx.fillStyle = '#090f1d';
+        ctx.fill();
+        ctx.strokeStyle = theme.cardBorder;
+        ctx.stroke();
+
+        ctx.font = 'bold 13px Inter, sans-serif';
+        const textWidth = ctx.measureText(p.name).width;
+        roundRect(ctx, 48, y + 14, textWidth + 20, 28, 7);
+        ctx.fillStyle = theme.badgeBg;
+        ctx.fill();
+        ctx.strokeStyle = theme.badgeBorder;
+        ctx.stroke();
+
+        ctx.fillStyle = theme.lightText;
+        ctx.fillText(p.name, 58, y + 33);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillText(`${p.tables} mesas · ${pct}%`, 58 + textWidth + 24, y + 32);
+
+        const amountStr = formatCLP(p.amount);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 19px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(amountStr, width - 50, y + 35);
+        ctx.textAlign = 'left';
+
+        y += rowHeight;
+      });
+
+      ctx.strokeStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.moveTo(34, y + 6);
+      ctx.lineTo(width - 34, y + 6);
+      ctx.stroke();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText('TOTAL REPARTIDO', 34, y + 34);
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 22px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(formatCLP(assignedTotal), width - 34, y + 36);
+      ctx.textAlign = 'left';
+
+      if (pendingTotal > 0) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillText(`* Horas extra pendientes por asignar: ${formatCLP(pendingTotal)}`, 34, y + 58);
+      }
+
+      return { canvas, firstDate: dates[0] || 'semana' };
+    }
+
+    function copySummaryImage() {
+      const result = buildSummaryCanvas();
+      if (!result) return;
+
+      result.canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        try {
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            const btn = document.getElementById('copyImgBtn');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>¡Copiada!</span>`;
+            lucide.createIcons();
+            setTimeout(() => {
+              btn.innerHTML = originalHtml;
+              lucide.createIcons();
+            }, 2200);
+          } else {
+            alert('Tu navegador no permite copiar imágenes directo al portapapeles. Usa el botón "Bajar foto".');
+          }
+        } catch (err) {
+          alert('No se pudo copiar la imagen al portapapeles (requiere abrir la página en HTTPS o localhost). Usa "Bajar foto".');
+        }
+      }, 'image/png');
+    }
+
+    function downloadSummaryImage() {
+      const result = buildSummaryCanvas();
+      if (!result) return;
+
+      result.canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Propinas_${result.firstDate}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        const btn = document.getElementById('downloadImgBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i><span>¡Bajado!</span>`;
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+          lucide.createIcons();
+        }, 2200);
+      }, 'image/png');
+    }
+
+    // =========================================================================
+    // 6. RENDERIZADO DE INTERFAZ (RESPONSIVE + COLORIDO PERSONALIZADO)
+    // =========================================================================
+    function formatCLP(num) {
+      return '$' + Math.round(num).toLocaleString('es-CL');
+    }
+
+    function renderOvertimePanel() {
+      const card       = document.getElementById('overtimeHeaderCard');
+      const iconBox    = document.getElementById('overtimeIconBox');
+      const kicker     = document.getElementById('overtimeKicker');
+      const grossEl    = document.getElementById('overtimeGrossTotal');
+      const statusPill = document.getElementById('overtimeStatusPill');
+      const breakdown  = document.getElementById('overtimeBreakdownText');
+
+      const totalCount     = state.outOfHoursSales.length;
+      const grossOvertime  = state.outOfHoursSales.reduce((acc, s) => acc + s.tip, 0);
+      const pendingSales   = state.outOfHoursSales.filter(s => s.computedParticipants.length === 0);
+      const pendingCount   = pendingSales.length;
+      const pendingSum     = pendingSales.reduce((acc, s) => acc + s.tip, 0);
+      const assignedSum    = grossOvertime - pendingSum;
+
+      grossEl.textContent = formatCLP(grossOvertime);
+
+      if (pendingCount > 0) {
+        card.className       = 'bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-lg transition-colors';
+        iconBox.className    = 'bg-amber-500/20 border border-amber-500/30 p-2 sm:p-2.5 rounded-xl text-amber-400 shrink-0';
+        iconBox.innerHTML    = '<i data-lucide="bell-ring" class="w-5 h-5"></i>';
+        kicker.className     = 'text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-amber-400 block';
+        kicker.textContent   = 'Atención · Pendiente de asignar';
+        grossEl.className    = 'text-xl sm:text-2xl font-bold text-amber-300 tabular-nums';
+        statusPill.className = 'px-2.5 py-1 rounded-full font-bold bg-amber-500/20 text-amber-200 border border-amber-500/30';
+        statusPill.textContent = `${pendingCount} de ${totalCount} ${totalCount === 1 ? 'mesa pendiente' : 'mesas pendientes'}`;
+      } else if (totalCount > 0) {
+        card.className       = 'bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-lg transition-colors';
+        iconBox.className    = 'bg-emerald-500/15 border border-emerald-500/30 p-2 sm:p-2.5 rounded-xl text-emerald-400 shrink-0';
+        iconBox.innerHTML    = '<i data-lucide="check-circle-2" class="w-5 h-5"></i>';
+        kicker.className     = 'text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-400 block';
+        kicker.textContent   = 'Horas Extra · Todo Asignado';
+        grossEl.className    = 'text-xl sm:text-2xl font-bold text-white tabular-nums';
+        statusPill.className = 'px-2.5 py-1 rounded-full font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        statusPill.textContent = `${totalCount} ${totalCount === 1 ? 'mesa registrada' : 'mesas registradas'} (100%)`;
+      } else {
+        card.className       = 'bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg transition-colors';
+        iconBox.className    = 'bg-slate-800 border border-slate-700 p-2 sm:p-2.5 rounded-xl text-slate-400 shrink-0';
+        iconBox.innerHTML    = '<i data-lucide="clock" class="w-5 h-5"></i>';
+        kicker.className     = 'text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 block';
+        kicker.textContent   = 'Registro Aparte';
+        grossEl.className    = 'text-xl sm:text-2xl font-bold text-slate-400 tabular-nums';
+        statusPill.className = 'px-2.5 py-1 rounded-full font-semibold bg-slate-800 text-slate-400 border border-slate-700';
+        statusPill.textContent = '0 mesas fuera de horario';
+      }
+
+      breakdown.innerHTML = `
+        Asignado: <strong class="text-emerald-400">${formatCLP(assignedSum)}</strong> ·
+        Pendiente: <strong class="${pendingSum > 0 ? 'text-amber-300' : 'text-slate-300'}">${formatCLP(pendingSum)}</strong>
+      `;
+    }
+
+    function renderOvertimeAudit() {
+      const filterMode  = document.getElementById('overtimeStatusFilter').value;
+      const tbody       = document.getElementById('overtimeAuditBody');
+      const mobileCards = document.getElementById('overtimeMobileCards');
+      tbody.innerHTML       = '';
+      mobileCards.innerHTML = '';
+
+      const filtered = state.outOfHoursSales.filter(s => {
+        const isPending = s.computedParticipants.length === 0;
+        if (filterMode === 'PENDING') return isPending;
+        if (filterMode === 'ASSIGNED') return !isPending;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        const emptyMsg = state.outOfHoursSales.length === 0
+          ? 'No hubo ventas fuera del horario regular en este archivo.'
+          : 'No hay ventas en esta vista con el filtro seleccionado.';
+        tbody.innerHTML = `<tr><td colspan="5" class="py-10 px-4 text-center text-xs text-slate-500">${emptyMsg}</td></tr>`;
+        mobileCards.innerHTML = `<div class="py-8 px-4 text-center text-xs text-slate-500">${emptyMsg}</div>`;
+        return;
+      }
+
+      const globalTeamNames = new Set(state.teamMembers.map(m => m.name));
+      Object.values(state.daySchedules).forEach(d => d.staff.forEach(p => globalTeamNames.add(p.name)));
+
+      filtered.forEach(sale => {
+        const isPending = sale.computedParticipants.length === 0;
+        const perPerson = !isPending ? Math.round(sale.tip / sale.computedParticipants.length) : 0;
+
+        const chipsHtml = Array.from(globalTeamNames).map(name => {
+          const isIncluded = sale.computedParticipants.includes(name);
+          const theme = getPersonTheme(name);
+          const inlineStyle = isIncluded ? theme.badgeInlineStyle : '';
+          const stateClass = isIncluded
+            ? 'font-semibold shadow-sm'
+            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border-slate-700 opacity-75';
+
+          return `
+            <button onclick="toggleTableParticipant('${sale.id}', '${name}')"
+              style="${inlineStyle}"
+              class="px-2.5 py-1 md:py-0.5 rounded-lg md:rounded-md text-xs border transition mr-1.5 mb-1.5 md:mr-1 md:mb-1 active:scale-95 ${stateClass}">
+              ${isIncluded ? '✓ ' : '+ '}${name}
+            </button>
+          `;
+        }).join('');
+
+        const statusBadge = isPending
+          ? `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">Pendiente</span>`
+          : `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Asignada</span>`;
+
+        // Fila Desktop
+        const tr = document.createElement('tr');
+        tr.className = isPending
+          ? 'bg-amber-500/5 hover:bg-amber-500/10 transition'
+          : 'hover:bg-slate-800/40 transition';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-xs text-slate-400 whitespace-nowrap align-top">
+            <div class="font-semibold text-slate-200">${DAY_NAMES[sale.dow]} ${sale.dateKey.split('-').reverse().join('/')}</div>
+            <div class="font-mono text-amber-400 font-bold mt-0.5">${sale.time}</div>
+          </td>
+          <td class="py-2.5 px-3 text-xs font-medium text-slate-200 align-top">
+            <div class="mb-1">${sale.table}</div>
+            ${statusBadge}
+          </td>
+          <td class="py-2.5 px-3 text-xs font-bold text-white text-right tabular-nums align-top">${formatCLP(sale.tip)}</td>
+          <td class="py-2.5 px-3 align-top">${chipsHtml}</td>
+          <td class="py-2.5 px-3 text-xs ${isPending ? 'text-amber-400 font-semibold' : 'text-slate-400'} text-right tabular-nums align-top">
+            ${isPending ? '—' : formatCLP(perPerson)}
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // Tarjeta Móvil
+        const card = document.createElement('div');
+        card.className = `p-3.5 space-y-2.5 ${isPending ? 'bg-amber-500/5' : ''}`;
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-white">${sale.table}</span>
+                ${statusBadge}
+              </div>
+              <div class="text-[11px] text-slate-400 mt-0.5">
+                ${DAY_NAMES[sale.dow]} ${sale.dateKey.split('-').reverse().join('/')} · <span class="font-mono text-amber-400 font-bold">${sale.time}</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm font-bold text-white tabular-nums">${formatCLP(sale.tip)}</div>
+              <div class="text-[11px] ${isPending ? 'text-amber-400' : 'text-slate-400'} tabular-nums">
+                ${isPending ? 'Sin asignar' : `${formatCLP(perPerson)} c/u`}
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap pt-0.5">${chipsHtml}</div>
+        `;
+        mobileCards.appendChild(card);
+      });
+    }
+
+    function renderPayoutCards(grandTotal, assignedTotal) {
+      document.getElementById('grandTotalDisplay').textContent = formatCLP(grandTotal);
+      const pendingSum = grandTotal - assignedTotal;
+      document.getElementById('assignedVsTotalLabel').textContent = pendingSum > 0
+        ? `${formatCLP(assignedTotal)} asignado · ${formatCLP(pendingSum)} pendiente`
+        : `100% asignado`;
+
+      const grid = document.getElementById('payoutCardsGrid');
+      grid.innerHTML = '';
+
+      state.payouts.forEach(p => {
+        if (p.amount === 0 && p.tables === 0) return;
+        const pct = assignedTotal > 0 ? ((p.amount / assignedTotal) * 100).toFixed(1) : '0.0';
+        const theme = getPersonTheme(p.name);
+        const exactFormatted = '$' + p.exact.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const card = document.createElement('div');
+        card.className = 'relative overflow-hidden rounded-2xl p-4 bg-slate-950/90 border flex flex-col justify-between transition hover:-translate-y-0.5';
+        card.style.borderColor = theme.cardBorder;
+        card.style.boxShadow = theme.glowShadow;
+        card.style.backgroundImage = `linear-gradient(165deg, ${theme.badgeBgSoft} 0%, rgba(2, 6, 23, 0.95) 65%)`;
+
+        card.innerHTML = `
+          <div class="absolute top-0 left-0 right-0 h-1" style="background-color: ${theme.rawHex};"></div>
+          <div class="flex items-center justify-between gap-2 pt-0.5">
+            <span style="${theme.badgeInlineStyle}" class="px-2.5 py-1 rounded-lg text-xs font-bold border tracking-wide shadow-sm truncate">
+              ${p.name}
+            </span>
+            <span style="color: ${theme.lightText};" class="text-xs font-semibold tabular-nums shrink-0">${pct}%</span>
+          </div>
+          <div class="mt-3.5">
+            <div class="text-2xl font-bold text-white tabular-nums tracking-tight">${formatCLP(p.amount)}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5 tabular-nums">Exacto: ${exactFormatted}</div>
+            <div class="mt-2 pt-2 border-t border-slate-800/70 flex items-center justify-between text-xs text-slate-400">
+              <span>Mesas atendidas</span>
+              <strong style="color: ${theme.lightText};" class="font-bold tabular-nums">${p.tables}</strong>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderDaysSchedule() {
+      const grid = document.getElementById('daysScheduleGrid');
+      grid.innerHTML = '';
+
+      Object.values(state.daySchedules).forEach(dayObj => {
+        const daySales = state.sales.filter(s => s.dateKey === dayObj.dateKey);
+        const dayTotal = daySales.reduce((sum, s) => sum + s.tip, 0);
+        const formattedDate = dayObj.dateKey.split('-').reverse().join('/');
+
+        const card = document.createElement('div');
+        card.className = 'border border-slate-800 rounded-xl p-3.5 bg-slate-950/60 flex flex-col justify-between';
+
+        let staffRowsHtml = dayObj.staff.map((person, idx) => {
+          const theme = getPersonTheme(person.name);
+          const rowOpacity = person.active ? 'opacity-100' : 'opacity-45';
+          const pillStyle = person.active
+            ? theme.badgeInlineStyle
+            : 'background-color: rgba(30, 41, 59, 0.5); color: #94a3b8; border-color: rgba(51, 65, 85, 0.7);';
+          const switchTrackStyle = person.active
+            ? `background-color: ${theme.rawHex};`
+            : 'background-color: #1e293b;';
+
+          return `
+            <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 py-2 border-b border-slate-800/70 last:border-0 transition-opacity ${rowOpacity}">
+              <label class="flex items-center gap-2 cursor-pointer select-none min-w-0 flex-1">
+                <input type="checkbox" ${person.active ? 'checked' : ''} onchange="toggleStaffActive('${dayObj.dateKey}', ${idx})" class="sr-only" />
+                <span style="${switchTrackStyle}" class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-200 border border-white/10">
+                  <span class="inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition-transform duration-200 ${person.active ? 'translate-x-3.5' : 'translate-x-0.5'}"></span>
+                </span>
+                <span style="${pillStyle}" class="px-2.5 py-0.5 rounded-full text-xs font-semibold border truncate transition-all">
+                  ${person.name}
+                </span>
+              </label>
+              <div class="flex items-center gap-1 text-xs shrink-0 ml-auto">
+                <input type="time" value="${person.start}" ${!person.active ? 'disabled' : ''} onchange="updateStaffTime('${dayObj.dateKey}', ${idx}, 'start', this.value)" class="border border-slate-700/90 rounded-lg px-1.5 py-1 bg-slate-900/90 text-slate-200 focus:border-emerald-500 focus:outline-none tabular-nums" />
+                <span class="text-slate-600 text-[11px]">a</span>
+                <input type="time" value="${person.end}" ${!person.active ? 'disabled' : ''} onchange="updateStaffTime('${dayObj.dateKey}', ${idx}, 'end', this.value)" class="border border-slate-700/90 rounded-lg px-1.5 py-1 bg-slate-900/90 text-slate-200 focus:border-emerald-500 focus:outline-none tabular-nums" />
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-1.5">
+              <div>
+                <span class="text-sm font-bold text-white">${dayObj.dayName}</span>
+                <span class="text-xs text-slate-400 ml-1">${formattedDate}</span>
+              </div>
+              <span class="text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                ${formatCLP(dayTotal)} (${daySales.length} m.)
+              </span>
+            </div>
+            <div class="space-y-0.5">
+              ${staffRowsHtml}
+            </div>
+          </div>
+          <button onclick="addReplacementStaff('${dayObj.dateKey}')" class="mt-2.5 w-full text-xs text-slate-400 hover:text-emerald-300 hover:border-emerald-500/40 hover:bg-emerald-500/5 py-2 sm:py-1.5 rounded-lg border border-dashed border-slate-700 transition flex items-center justify-center gap-1">
+            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+            Agregar reemplazo / extra
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function matchesTimeSlot(hhmm, slot) {
+      if (slot === 'ALL') return true;
+      const mins = timeToMinutes(hhmm);
+      if (slot === '09:00-12:00') return mins >= 9 * 60 && mins < 12 * 60;
+      if (slot === '12:00-16:00') return mins >= 12 * 60 && mins < 16 * 60;
+      if (slot === '16:00-19:30') return mins >= 16 * 60 && mins < 19 * 60 + 30;
+      if (slot === '19:30+')      return mins >= 19 * 60 + 30;
+      return true;
+    }
+
+    function renderTablesAudit() {
+      const filterDate   = document.getElementById('dayFilterSelect').value;
+      const filterSlot   = document.getElementById('timeSlotFilterSelect').value;
+      const filterPerson = document.getElementById('personFilterSelect').value;
+      const tbody        = document.getElementById('auditTableBody');
+      const mobileCards  = document.getElementById('auditMobileCards');
+      tbody.innerHTML       = '';
+      mobileCards.innerHTML = '';
+
+      const regularSales = state.sales.filter(s => !s.isOutOfHours);
+
+      const filtered = regularSales.filter(s => {
+        if (filterDate !== 'ALL' && s.dateKey !== filterDate) return false;
+        if (!matchesTimeSlot(s.time, filterSlot)) return false;
+        if (filterPerson !== 'ALL' && !s.computedParticipants.includes(filterPerson)) return false;
+        return true;
+      });
+
+      const hasActiveFilters = filterDate !== 'ALL' || filterSlot !== 'ALL' || filterPerson !== 'ALL';
+      const filteredSum = filtered.reduce((acc, s) => acc + s.tip, 0);
+      document.getElementById('filteredSummaryBadge').textContent = hasActiveFilters
+        ? `${filtered.length} mesas · ${formatCLP(filteredSum)}`
+        : `${filtered.length} mesas regulares`;
+      document.getElementById('clearFiltersBtn').classList.toggle('hidden', !hasActiveFilters);
+
+      if (filtered.length === 0) {
+        const emptyMsg = 'No hay mesas en horario regular con los filtros seleccionados.';
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-xs text-slate-500">${emptyMsg}</td></tr>`;
+        mobileCards.innerHTML = `<div class="py-8 px-4 text-center text-xs text-slate-500">${emptyMsg}</div>`;
+        return;
+      }
+
+      filtered.forEach(sale => {
+        const dayObj = state.daySchedules[sale.dateKey];
+        const candidateNames = dayObj ? dayObj.staff.map(p => p.name) : sale.computedParticipants;
+        const perPerson = sale.computedParticipants.length > 0
+          ? Math.round(sale.tip / sale.computedParticipants.length)
+          : 0;
+
+        const chipsHtml = candidateNames.map(name => {
+          const isIncluded = sale.computedParticipants.includes(name);
+          const theme = getPersonTheme(name);
+          const inlineStyle = isIncluded ? theme.badgeInlineStyle : '';
+          const stateClass = isIncluded
+            ? 'font-semibold shadow-sm'
+            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border-slate-700 opacity-70';
+
+          return `
+            <button onclick="toggleTableParticipant('${sale.id}', '${name}')"
+              style="${inlineStyle}"
+              class="px-2.5 py-1 md:py-0.5 rounded-lg md:rounded-md text-xs border transition mr-1.5 mb-1.5 md:mr-1 md:mb-1 active:scale-95 ${stateClass}">
+              ${isIncluded ? '✓ ' : '+ '}${name}
+            </button>
+          `;
+        }).join('');
+
+        // Fila Desktop
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 text-xs text-slate-400 whitespace-nowrap">
+            <strong class="text-slate-200">${DAY_NAMES[sale.dow]}</strong> ${sale.dateKey.split('-').reverse().join('/')}
+          </td>
+          <td class="py-2.5 px-4 text-xs font-mono text-emerald-400 whitespace-nowrap">${sale.time}</td>
+          <td class="py-2.5 px-4 text-xs font-medium text-slate-200">${sale.table}</td>
+          <td class="py-2.5 px-4 text-xs font-bold text-white text-right tabular-nums">${formatCLP(sale.tip)}</td>
+          <td class="py-2.5 px-4">${chipsHtml}</td>
+          <td class="py-2.5 px-4 text-xs text-slate-400 text-right tabular-nums">${formatCLP(perPerson)}</td>
+        `;
+        tbody.appendChild(tr);
+
+        // Tarjeta Móvil
+        const card = document.createElement('div');
+        card.className = 'p-3.5 space-y-2.5';
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-xs font-bold text-white">${sale.table}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">
+                ${DAY_NAMES[sale.dow]} ${sale.dateKey.split('-').reverse().join('/')} · <span class="font-mono text-emerald-400 font-semibold">${sale.time}</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm font-bold text-white tabular-nums">${formatCLP(sale.tip)}</div>
+              <div class="text-[11px] text-slate-400 tabular-nums">${formatCLP(perPerson)} c/u</div>
+            </div>
+          </div>
+          <div class="flex flex-wrap pt-0.5">${chipsHtml}</div>
+        `;
+        mobileCards.appendChild(card);
+      });
+    }
+
+    // =========================================================================
+    // 7. EXPORTAR RESUMEN EN TEXTO
+    // =========================================================================
+    function copyWhatsAppSummary() {
+      const dates = Object.keys(state.daySchedules).sort();
+      const rangeStr = dates.length > 0
+        ? `${dates[0].split('-').reverse().join('/')} al ${dates[dates.length - 1].split('-').reverse().join('/')}`
+        : 'Semana';
+
+      const assignedTotal = state.payouts.reduce((acc, p) => acc + p.amount, 0);
+      const pendingTotal  = state.outOfHoursSales
+        .filter(s => s.computedParticipants.length === 0)
+        .reduce((acc, s) => acc + s.tip, 0);
+
+      let text = `*REPARTO DE PROPINAS* (${rangeStr})\n`;
+      text += `Total repartido: *${formatCLP(assignedTotal)}*\n`;
+      if (pendingTotal > 0) {
+        text += `⚠️ _Horas extra pendientes por asignar: ${formatCLP(pendingTotal)}_\n`;
+      }
+      text += `\n*Transferencias:*\n`;
+
+      state.payouts.forEach(p => {
+        if (p.amount > 0) {
+          text += `• *${p.name}:* ${formatCLP(p.amount)} (${p.tables} mesas)\n`;
+        }
+      });
+
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i><span>¡Copiado!</span>`;
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+          lucide.createIcons();
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
